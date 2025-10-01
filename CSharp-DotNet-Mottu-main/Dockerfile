@@ -1,45 +1,41 @@
-# Use a imagem base otimizada do .NET 9.0 Preview
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-preview-alpine AS base
-WORKDIR /app
-EXPOSE 5000
-EXPOSE 5001
-
-# Criar usuário não-root
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -S appuser -u 1001 -G appgroup
-
-# Use a imagem SDK do .NET 9.0 Preview para build
-FROM mcr.microsoft.com/dotnet/sdk:9.0-preview-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
 WORKDIR /src
 
 # Copiar arquivos de projeto e restaurar dependências
+# Isso otimiza o cache do Docker, pois o restore só é refeito se o .csproj mudar
 COPY ["challengeABD/*.csproj", "challengeABD/"]
 RUN dotnet restore "challengeABD/challengeABD.csproj"
 
-# Copiar todo o código fonte (incluindo a pasta challengeABD)
+# Copiar todo o código fonte (assumindo que um .dockerignore está configurado)
 COPY . .
 
-# Define o diretório de trabalho para a pasta do projeto antes do build
+# Definir o diretório de trabalho para a pasta do projeto
 WORKDIR "/src/challengeABD"
+
+# Construir a aplicação em modo Release
 RUN dotnet build "challengeABD.csproj" -c Release -o /app/build
 
-# Publicar aplicação
-FROM build AS publish
+# Publicar a aplicação para o diretório /app/publish
 RUN dotnet publish "challengeABD.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# Imagem final
-FROM base AS final
+# Estágio final de execução
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS final
 WORKDIR /app
 
-# Copiar arquivos publicados
-COPY --from=publish /app/publish .
+# Expor as portas que a aplicação irá escutar
+EXPOSE 5000
+EXPOSE 5001
 
-# Mudar para usuário não-root
+# Criar usuário não-root para segurança
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
+
+# Definir o usuário não-root para executar a aplicação
 USER appuser
 
-# Configurar variáveis de ambiente
-ENV ASPNETCORE_URLS=http://+:5000
-ENV ASPNETCORE_ENVIRONMENT=Production
+# Copiar os artefatos publicados do estágio de build para o estágio final
+COPY --from=build /app/publish .
 
-# Certifique-se que o nome da DLL está correto
+# Definir o ponto de entrada da aplicação
+# Substitua 'challengeABD.dll' pelo nome real do arquivo DLL principal da sua aplicação
 ENTRYPOINT ["dotnet", "challengeABD.dll"]
