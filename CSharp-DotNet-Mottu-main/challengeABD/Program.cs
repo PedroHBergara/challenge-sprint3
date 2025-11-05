@@ -3,7 +3,7 @@ using System.ComponentModel;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
-using challengeABD; 
+using challengeABD;
 using System.ComponentModel.DataAnnotations;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,38 +13,43 @@ builder.Services.AddDbContext<MotoDB>(options =>
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-builder.Services.AddEndpointsApiExplorer(); 
-builder.Services.AddOpenApi(option =>
+// Swagger (para substituir AddOpenApi)
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
 {
-    option.AddDocumentTransformer((document, context, cancellationToken) =>
+    c.SwaggerDoc("v1", new OpenApiInfo
     {
-        document.Info = new OpenApiInfo
+        Title = "Moto API",
+        Version = "v1",
+        Description = "API de gerenciamento de motos",
+        License = new OpenApiLicense()
         {
-            Title = "Moto API",
-            Version = "v1",
-            Description = "API de gerenciamento de motos",
-            License = new OpenApiLicense()
-            {
-                Name = "MIT",
-                Url = new Uri("https://opensource.org/licenses/MIT")
-            }
-        };
-        return Task.CompletedTask;
+            Name = "MIT",
+            Url = new Uri("https://opensource.org/licenses/MIT")
+        }
     });
 });
 
 var app = builder.Build();
 
-
-if (app.Environment.IsDevelopment())
+// Sempre habilitar Swagger
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseDeveloperExceptionPage();
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Moto API v1");
+    c.RoutePrefix = "swagger"; // URL final: /swagger/index.html
+});
+
+// Scalar UI opcional (também sempre ativo se você quiser no Azure)
+app.MapScalarApiReference();
+
+// Middlewares
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
 }
-
 app.UseHttpsRedirection();
-
 
 var motoGroup = app.MapGroup("/motos").WithTags("Moto");
 
@@ -134,4 +139,3 @@ public static class ValidationExtensions
             );
     }
 }
-
